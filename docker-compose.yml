@@ -29,8 +29,26 @@ services:
       DATABASE_URL: "postgres://devsvault:devsvault_dev_password@postgres:5432/devsvault?sslmode=disable"
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     depends_on:
       postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: devsvault-web
+    environment:
+      NEXT_PUBLIC_API_URL: "http://api:8080"
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
         condition: service_healthy
 
   redis:
