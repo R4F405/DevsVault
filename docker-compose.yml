@@ -17,6 +17,22 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: devsvault-api
+    environment:
+      DEVSVAULT_API_ADDR: ":8080"
+      DEVSVAULT_MASTER_KEY_B64: "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+      DEVSVAULT_AUTH_SIGNING_KEY: "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="
+      DATABASE_URL: "postgres://devsvault:devsvault_dev_password@postgres:5432/devsvault?sslmode=disable"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   redis:
     image: redis:7-alpine
     container_name: devsvault-redis

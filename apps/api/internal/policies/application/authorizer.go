@@ -19,7 +19,10 @@ const (
 	ActionAuditRead          Action = "audit:read"
 )
 
-var ErrForbidden = errors.New("forbidden")
+var (
+	ErrForbidden  = errors.New("forbidden")
+	ErrNoDecision = errors.New("no policy decision")
+)
 
 type Resource struct {
 	WorkspaceID   string
@@ -28,8 +31,21 @@ type Resource struct {
 	SecretID      string
 }
 
+type Decision string
+
+const (
+	DecisionNone  Decision = "none"
+	DecisionAllow Decision = "allow"
+	DecisionDeny  Decision = "deny"
+)
+
+type PolicyStore interface {
+	Decision(ctx context.Context, actor authdomain.Actor, action Action, resource Resource) (Decision, error)
+}
+
 type Authorizer struct {
 	roles map[string]map[Action]bool
+	store PolicyStore
 }
 
 func NewAuthorizer(roles map[string][]Action) *Authorizer {
@@ -41,6 +57,12 @@ func NewAuthorizer(roles map[string][]Action) *Authorizer {
 		}
 	}
 	return &Authorizer{roles: compiled}
+}
+
+func NewAuthorizerWithStore(roles map[string][]Action, store PolicyStore) *Authorizer {
+	authorizer := NewAuthorizer(roles)
+	authorizer.store = store
+	return authorizer
 }
 
 func DefaultRoleBindings() map[string][]Action {
@@ -69,9 +91,21 @@ func DefaultRoleBindings() map[string][]Action {
 	}
 }
 
-func (a *Authorizer) Authorize(_ context.Context, actor authdomain.Actor, action Action, _ Resource) error {
+func (a *Authorizer) Authorize(ctx context.Context, actor authdomain.Actor, action Action, resource Resource) error {
 	if actor.Type == authdomain.ActorAnonymous || actor.ID == "" {
 		return ErrForbidden
+	}
+	if a.store != nil {
+		decision, err := a.store.Decision(ctx, actor, action, resource)
+		if err != nil && !errors.Is(err, ErrNoDecision) {
+			return ErrForbidden
+		}
+		if decision == DecisionDeny {
+			return ErrForbidden
+		}
+		if decision == DecisionAllow {
+			return nil
+		}
 	}
 	for _, role := range actor.Roles {
 		if a.roles[role][action] {

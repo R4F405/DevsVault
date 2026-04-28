@@ -78,6 +78,7 @@ CREATE TABLE secrets (
     created_by_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_accessed_at TIMESTAMPTZ,
     revoked_at TIMESTAMPTZ,
     UNIQUE (environment_id, name),
     UNIQUE (logical_path)

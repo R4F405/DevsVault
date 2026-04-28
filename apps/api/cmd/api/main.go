@@ -17,9 +17,11 @@ import (
 	encapp "github.com/devsvault/devsvault/apps/api/internal/encryption/application"
 	encinfra "github.com/devsvault/devsvault/apps/api/internal/encryption/infrastructure"
 	policiesapp "github.com/devsvault/devsvault/apps/api/internal/policies/application"
+	policiesinfra "github.com/devsvault/devsvault/apps/api/internal/policies/infrastructure"
 	secretsapp "github.com/devsvault/devsvault/apps/api/internal/secrets/application"
 	secretsinfra "github.com/devsvault/devsvault/apps/api/internal/secrets/infrastructure"
 	httpapi "github.com/devsvault/devsvault/apps/api/internal/server/interfaces/http"
+	postgres "github.com/devsvault/devsvault/apps/api/internal/shared/postgres"
 )
 
 func main() {
@@ -38,11 +40,30 @@ func main() {
 		os.Exit(1)
 	}
 
-	auditRepo := auditinfra.NewMemoryRepository()
+	var auditRepo auditapp.Repository
+	var secretRepo secretsapp.Repository
+	var policyService *policiesapp.Authorizer
+
+	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		pool, err := postgres.NewPool(context.Background(), databaseURL)
+		if err != nil {
+			logger.Error("postgres connection failed", "error", "database unavailable")
+			os.Exit(1)
+		}
+		defer pool.Close()
+		logger.Info("using postgres repository")
+		auditRepo = auditinfra.NewPostgresRepository(pool)
+		secretRepo = secretsinfra.NewPostgresRepository(pool)
+		policyService = policiesapp.NewAuthorizerWithStore(policiesapp.DefaultRoleBindings(), policiesinfra.NewPostgresRepository(pool))
+	} else {
+		logger.Info("using in-memory repository")
+		auditRepo = auditinfra.NewMemoryRepository()
+		secretRepo = secretsinfra.NewMemoryRepository()
+		policyService = policiesapp.NewAuthorizer(policiesapp.DefaultRoleBindings())
+	}
+
 	auditService := auditapp.NewService(auditRepo)
-	policyService := policiesapp.NewAuthorizer(policiesapp.DefaultRoleBindings())
 	encryptionService := encapp.NewEnvelopeService(encinfra.NewStaticKEKProvider("dev-local-key", masterKey))
-	secretRepo := secretsinfra.NewMemoryRepository()
 	secretService := secretsapp.NewService(secretRepo, encryptionService, policyService, auditService)
 	authService := authapp.NewService(authapp.NewHMACTokenIssuer(signingKey, time.Hour), auditService)
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -41,7 +42,8 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/secrets", r.withAuth(http.HandlerFunc(r.listSecrets)))
 	mux.Handle("POST /api/v1/secrets", r.withAuth(http.HandlerFunc(r.createSecret)))
 	mux.Handle("GET /api/v1/secrets/resolve", r.withAuth(http.HandlerFunc(r.resolveSecret)))
-	mux.Handle("POST /api/v1/secrets/", r.withAuth(http.HandlerFunc(r.secretAction)))
+	mux.Handle("POST /api/v1/secrets/{id}/versions", r.withAuth(http.HandlerFunc(r.rotateSecret)))
+	mux.Handle("POST /api/v1/secrets/{id}/versions/{version}/revoke", r.withAuth(http.HandlerFunc(r.revokeSecretVersion)))
 	mux.Handle("GET /api/v1/audit/events", r.withAuth(http.HandlerFunc(r.listAudit)))
 	return securityHeaders(mux)
 }
@@ -59,7 +61,12 @@ func (r *router) login(w http.ResponseWriter, req *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	token, err := r.deps.Auth.Login(req.Context(), authapp.LoginInput{Subject: input.Subject, ActorType: authdomain.ActorType(input.ActorType)})
+	actorType, ok := parseActorType(input.ActorType)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid actor type")
+		return
+	}
+	token, err := r.deps.Auth.Login(req.Context(), authapp.LoginInput{Subject: input.Subject, ActorType: actorType})
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
@@ -99,38 +106,33 @@ func (r *router) resolveSecret(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, http.StatusOK, resolved)
 }
 
-func (r *router) secretAction(w http.ResponseWriter, req *http.Request) {
-	parts := strings.Split(strings.TrimPrefix(req.URL.Path, "/api/v1/secrets/"), "/")
-	if len(parts) == 2 && parts[1] == "versions" {
-		var body struct {
-			Value string `json:"value"`
-		}
-		if err := decodeJSON(req, &body); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid request")
-			return
-		}
-		updated, err := r.deps.Secrets.Rotate(req.Context(), actorFrom(req.Context()), secretsapp.RotateInput{SecretID: parts[0], Value: body.Value})
-		if err != nil {
-			writeError(w, statusFromError(err), "secret could not be rotated")
-			return
-		}
-		writeJSON(w, http.StatusOK, updated)
+func (r *router) rotateSecret(w http.ResponseWriter, req *http.Request) {
+	var body struct {
+		Value string `json:"value"`
+	}
+	if err := decodeJSON(req, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	if len(parts) == 4 && parts[1] == "versions" && parts[3] == "revoke" {
-		version, err := strconv.Atoi(parts[2])
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid request")
-			return
-		}
-		if err := r.deps.Secrets.RevokeVersion(req.Context(), actorFrom(req.Context()), parts[0], version); err != nil {
-			writeError(w, statusFromError(err), "secret version could not be revoked")
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "revoked"})
+	updated, err := r.deps.Secrets.Rotate(req.Context(), actorFrom(req.Context()), secretsapp.RotateInput{SecretID: req.PathValue("id"), Value: body.Value})
+	if err != nil {
+		writeError(w, statusFromError(err), "secret could not be rotated")
 		return
 	}
-	writeError(w, http.StatusNotFound, "not found")
+	writeJSON(w, http.StatusOK, updated)
+}
+
+func (r *router) revokeSecretVersion(w http.ResponseWriter, req *http.Request) {
+	version, err := strconv.Atoi(req.PathValue("version"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if err := r.deps.Secrets.RevokeVersion(req.Context(), actorFrom(req.Context()), req.PathValue("id"), version); err != nil {
+		writeError(w, statusFromError(err), "secret version could not be revoked")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked"})
 }
 
 func (r *router) listAudit(w http.ResponseWriter, req *http.Request) {
@@ -174,8 +176,21 @@ func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Content-Security-Policy", "default-src 'none'")
+		if os.Getenv("HTTPS_ENABLED") == "true" {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		next.ServeHTTP(w, req)
 	})
+}
+
+func parseActorType(value string) (authdomain.ActorType, bool) {
+	if value == "" {
+		return authdomain.ActorUser, true
+	}
+	actorType := authdomain.ActorType(value)
+	return actorType, actorType == authdomain.ActorUser || actorType == authdomain.ActorService
 }
 
 func decodeJSON(req *http.Request, target any) error {
