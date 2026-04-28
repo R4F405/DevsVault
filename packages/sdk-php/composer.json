@@ -1,0 +1,15 @@
+{
+  "name": "devsvault/sdk-php",
+  "description": "Minimal DevsVault PHP and Laravel SDK",
+  "license": "proprietary",
+  "type": "library",
+  "autoload": {
+    "psr-4": {
+      "DevsVault\\": "src/"
+    }
+  },
+  "require": {
+    "php": ">=8.2",
+    "illuminate/support": "^11.0 || ^12.0"
+  }
+}

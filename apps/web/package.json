@@ -1,0 +1,28 @@
+{
+  "name": "@devsvault/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "lint": "eslint . --max-warnings=0"
+  },
+  "dependencies": {
+    "lucide-react": "^1.12.0",
+    "next": "^16.2.4",
+    "postcss": "^8.5.12",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.4",
+    "typescript": "^5.5.3"
+  },
+  "overrides": {
+    "postcss": "^8.5.12"
+  }
+}
