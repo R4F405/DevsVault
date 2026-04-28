@@ -14,16 +14,22 @@ import (
 	auditapp "github.com/devsvault/devsvault/apps/api/internal/audit/application"
 	authapp "github.com/devsvault/devsvault/apps/api/internal/auth/application"
 	authdomain "github.com/devsvault/devsvault/apps/api/internal/auth/domain"
+	environmentsapp "github.com/devsvault/devsvault/apps/api/internal/environments/application"
 	policiesapp "github.com/devsvault/devsvault/apps/api/internal/policies/application"
+	projectsapp "github.com/devsvault/devsvault/apps/api/internal/projects/application"
 	secretsapp "github.com/devsvault/devsvault/apps/api/internal/secrets/application"
+	workspacesapp "github.com/devsvault/devsvault/apps/api/internal/workspaces/application"
 )
 
 type Dependencies struct {
-	Auth    *authapp.Service
-	Secrets *secretsapp.Service
-	Audit   *auditapp.Service
-	Policy  *policiesapp.Authorizer
-	Logger  *slog.Logger
+	Auth         *authapp.Service
+	Secrets      *secretsapp.Service
+	Audit        *auditapp.Service
+	Policy       *policiesapp.Authorizer
+	Workspaces   *workspacesapp.Service
+	Projects     *projectsapp.Service
+	Environments *environmentsapp.Service
+	Logger       *slog.Logger
 }
 
 type router struct {
@@ -39,6 +45,22 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", r.health)
 	mux.HandleFunc("POST /api/v1/auth/login", r.login)
+	mux.Handle("POST /api/v1/workspaces", r.withAuth(http.HandlerFunc(r.createWorkspace)))
+	mux.Handle("GET /api/v1/workspaces", r.withAuth(http.HandlerFunc(r.listWorkspaces)))
+	mux.Handle("GET /api/v1/workspaces/{id}", r.withAuth(http.HandlerFunc(r.getWorkspace)))
+	mux.Handle("PATCH /api/v1/workspaces/{id}", r.withAuth(http.HandlerFunc(r.updateWorkspace)))
+	mux.Handle("DELETE /api/v1/workspaces/{id}", r.withAuth(http.HandlerFunc(r.deleteWorkspace)))
+	mux.Handle("POST /api/v1/workspaces/{workspaceId}/projects", r.withAuth(http.HandlerFunc(r.createProject)))
+	mux.Handle("GET /api/v1/workspaces/{workspaceId}/projects", r.withAuth(http.HandlerFunc(r.listProjects)))
+	mux.Handle("GET /api/v1/workspaces/{workspaceId}/projects/{id}", r.withAuth(http.HandlerFunc(r.getProject)))
+	mux.Handle("PATCH /api/v1/workspaces/{workspaceId}/projects/{id}", r.withAuth(http.HandlerFunc(r.updateProject)))
+	mux.Handle("DELETE /api/v1/workspaces/{workspaceId}/projects/{id}", r.withAuth(http.HandlerFunc(r.deleteProject)))
+	mux.Handle("GET /api/v1/projects/{id}", r.withAuth(http.HandlerFunc(r.getProjectByID)))
+	mux.Handle("POST /api/v1/projects/{projectId}/environments", r.withAuth(http.HandlerFunc(r.createEnvironment)))
+	mux.Handle("GET /api/v1/projects/{projectId}/environments", r.withAuth(http.HandlerFunc(r.listEnvironments)))
+	mux.Handle("GET /api/v1/projects/{projectId}/environments/{id}", r.withAuth(http.HandlerFunc(r.getEnvironment)))
+	mux.Handle("DELETE /api/v1/projects/{projectId}/environments/{id}", r.withAuth(http.HandlerFunc(r.deleteEnvironment)))
+	mux.Handle("GET /api/v1/environments/{id}", r.withAuth(http.HandlerFunc(r.getEnvironmentByID)))
 	mux.Handle("GET /api/v1/secrets", r.withAuth(http.HandlerFunc(r.listSecrets)))
 	mux.Handle("POST /api/v1/secrets", r.withAuth(http.HandlerFunc(r.createSecret)))
 	mux.Handle("GET /api/v1/secrets/resolve", r.withAuth(http.HandlerFunc(r.resolveSecret)))

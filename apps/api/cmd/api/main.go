@@ -16,12 +16,18 @@ import (
 	authapp "github.com/devsvault/devsvault/apps/api/internal/auth/application"
 	encapp "github.com/devsvault/devsvault/apps/api/internal/encryption/application"
 	encinfra "github.com/devsvault/devsvault/apps/api/internal/encryption/infrastructure"
+	environmentsapp "github.com/devsvault/devsvault/apps/api/internal/environments/application"
+	environmentsinfra "github.com/devsvault/devsvault/apps/api/internal/environments/infrastructure"
 	policiesapp "github.com/devsvault/devsvault/apps/api/internal/policies/application"
 	policiesinfra "github.com/devsvault/devsvault/apps/api/internal/policies/infrastructure"
+	projectsapp "github.com/devsvault/devsvault/apps/api/internal/projects/application"
+	projectsinfra "github.com/devsvault/devsvault/apps/api/internal/projects/infrastructure"
 	secretsapp "github.com/devsvault/devsvault/apps/api/internal/secrets/application"
 	secretsinfra "github.com/devsvault/devsvault/apps/api/internal/secrets/infrastructure"
 	httpapi "github.com/devsvault/devsvault/apps/api/internal/server/interfaces/http"
 	postgres "github.com/devsvault/devsvault/apps/api/internal/shared/postgres"
+	workspacesapp "github.com/devsvault/devsvault/apps/api/internal/workspaces/application"
+	workspacesinfra "github.com/devsvault/devsvault/apps/api/internal/workspaces/infrastructure"
 )
 
 func main() {
@@ -42,6 +48,9 @@ func main() {
 
 	var auditRepo auditapp.Repository
 	var secretRepo secretsapp.Repository
+	var workspaceRepo workspacesapp.Repository
+	var projectRepo projectsapp.Repository
+	var environmentRepo environmentsapp.Repository
 	var policyService *policiesapp.Authorizer
 
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
@@ -54,11 +63,17 @@ func main() {
 		logger.Info("using postgres repository")
 		auditRepo = auditinfra.NewPostgresRepository(pool)
 		secretRepo = secretsinfra.NewPostgresRepository(pool)
+		workspaceRepo = workspacesinfra.NewPostgresRepository(pool)
+		projectRepo = projectsinfra.NewPostgresRepository(pool)
+		environmentRepo = environmentsinfra.NewPostgresRepository(pool)
 		policyService = policiesapp.NewAuthorizerWithStore(policiesapp.DefaultRoleBindings(), policiesinfra.NewPostgresRepository(pool))
 	} else {
 		logger.Info("using in-memory repository")
 		auditRepo = auditinfra.NewMemoryRepository()
 		secretRepo = secretsinfra.NewMemoryRepository()
+		workspaceRepo = workspacesinfra.NewMemoryRepository()
+		projectRepo = projectsinfra.NewMemoryRepository()
+		environmentRepo = environmentsinfra.NewMemoryRepository()
 		policyService = policiesapp.NewAuthorizer(policiesapp.DefaultRoleBindings())
 	}
 
@@ -66,13 +81,19 @@ func main() {
 	encryptionService := encapp.NewEnvelopeService(encinfra.NewStaticKEKProvider("dev-local-key", masterKey))
 	secretService := secretsapp.NewService(secretRepo, encryptionService, policyService, auditService)
 	authService := authapp.NewService(authapp.NewHMACTokenIssuer(signingKey, time.Hour), auditService)
+	workspaceService := workspacesapp.NewService(workspaceRepo)
+	projectService := projectsapp.NewService(projectRepo)
+	environmentService := environmentsapp.NewService(environmentRepo)
 
 	router := httpapi.NewRouter(httpapi.Dependencies{
-		Auth:    authService,
-		Secrets: secretService,
-		Audit:   auditService,
-		Policy:  policyService,
-		Logger:  logger,
+		Auth:         authService,
+		Secrets:      secretService,
+		Audit:        auditService,
+		Policy:       policyService,
+		Workspaces:   workspaceService,
+		Projects:     projectService,
+		Environments: environmentService,
+		Logger:       logger,
 	})
 
 	server := &http.Server{

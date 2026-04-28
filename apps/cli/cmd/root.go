@@ -25,7 +25,7 @@ func NewRootCommand() *cobra.Command {
 	root.PersistentFlags().BoolVar(&verbose, "verbose", false, "print additional diagnostic information")
 	root.SetOut(os.Stdout)
 	root.SetErr(os.Stderr)
-	root.AddCommand(newLoginCommand(), newLogoutCommand(), newSecretsCommand(), newRunCommand())
+	root.AddCommand(newLoginCommand(), newLogoutCommand(), newWorkspacesCommand(), newProjectsCommand(), newEnvironmentsCommand(), newSecretsCommand(), newRunCommand())
 	return root
 }
 
