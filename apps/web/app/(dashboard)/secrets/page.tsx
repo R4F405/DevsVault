@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, Eye, EyeOff, Plus, RotateCcw, ShieldX } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -41,10 +41,10 @@ function SecretsContent() {
   const workspaces = useQuery({ queryKey: ["workspaces"], queryFn: () => api.listWorkspaces() });
   const projects = useQuery({ queryKey: ["projects", workspaceId], queryFn: () => api.listProjects(workspaceId), enabled: workspaceId !== "" });
   const environments = useQuery({ queryKey: ["environments", projectId], queryFn: () => api.listEnvironments(projectId), enabled: projectId !== "" });
-  const secrets = useQuery({ queryKey: ["secrets"], queryFn: () => api.listSecrets() });
+  const secrets = useQuery({ queryKey: ["secrets", workspaceId, projectId, environmentId], queryFn: () => api.listSecrets({ workspaceId, projectId, environmentId }) });
   const secretValue = useQuery({ queryKey: ["secret-value", viewSecret?.logical_path, valueNonce], queryFn: () => api.resolveSecret(viewSecret?.logical_path ?? ""), enabled: viewSecret !== null, staleTime: 0, gcTime: 0, retry: false });
 
-  const filtered = useMemo(() => (secrets.data ?? []).filter((secret) => (!workspaceId || secret.workspace_id === workspaceId) && (!projectId || secret.project_id === projectId) && (!environmentId || secret.environment_id === environmentId)), [environmentId, projectId, secrets.data, workspaceId]);
+  const filtered = secrets.data ?? [];
 
   const form = useForm<SecretForm>({ resolver: zodResolver(secretSchema), defaultValues: { workspace_id: workspaceId, project_id: projectId, environment_id: environmentId, name: "", value: "" } });
   const watchedWorkspace = form.watch("workspace_id");

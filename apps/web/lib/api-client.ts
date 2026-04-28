@@ -64,6 +64,12 @@ export type AuditEvent = {
 
 type ListResponse<T> = { items: T[] };
 
+type SecretFilters = {
+  workspaceId?: string;
+  projectId?: string;
+  environmentId?: string;
+};
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -140,8 +146,19 @@ export class ApiClient {
     return this.request<void>(`/api/v1/projects/${encodeURIComponent(projectId)}/environments/${encodeURIComponent(environmentId)}`, { method: "DELETE" });
   }
 
-  listSecrets() {
-    return this.request<ListResponse<SecretMetadata>>("/api/v1/secrets").then((response) => response.items);
+  listSecrets(filters: SecretFilters = {}) {
+    const params = new URLSearchParams();
+    if (filters.workspaceId) {
+      params.set("workspace_id", filters.workspaceId);
+    }
+    if (filters.projectId) {
+      params.set("project_id", filters.projectId);
+    }
+    if (filters.environmentId) {
+      params.set("environment_id", filters.environmentId);
+    }
+    const query = params.toString();
+    return this.request<ListResponse<SecretMetadata>>(`/api/v1/secrets${query ? `?${query}` : ""}`).then((response) => response.items);
   }
 
   createSecret(input: { workspace_id: string; project_id: string; environment_id: string; name: string; value: string }) {
