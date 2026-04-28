@@ -15,10 +15,13 @@ import (
 	authapp "github.com/devsvault/devsvault/apps/api/internal/auth/application"
 	authdomain "github.com/devsvault/devsvault/apps/api/internal/auth/domain"
 	environmentsapp "github.com/devsvault/devsvault/apps/api/internal/environments/application"
+	environmentsdomain "github.com/devsvault/devsvault/apps/api/internal/environments/domain"
 	policiesapp "github.com/devsvault/devsvault/apps/api/internal/policies/application"
 	projectsapp "github.com/devsvault/devsvault/apps/api/internal/projects/application"
+	projectsdomain "github.com/devsvault/devsvault/apps/api/internal/projects/domain"
 	secretsapp "github.com/devsvault/devsvault/apps/api/internal/secrets/application"
 	workspacesapp "github.com/devsvault/devsvault/apps/api/internal/workspaces/application"
+	workspacesdomain "github.com/devsvault/devsvault/apps/api/internal/workspaces/domain"
 )
 
 type Dependencies struct {
@@ -235,10 +238,12 @@ func statusFromError(err error) int {
 	switch {
 	case errors.Is(err, policiesapp.ErrForbidden):
 		return http.StatusForbidden
-	case errors.Is(err, secretsapp.ErrInvalidInput):
+	case errors.Is(err, secretsapp.ErrInvalidInput), errors.Is(err, workspacesdomain.ErrInvalidInput), errors.Is(err, projectsdomain.ErrInvalidInput), errors.Is(err, environmentsdomain.ErrInvalidInput):
 		return http.StatusBadRequest
-	case errors.Is(err, secretsapp.ErrNotFound):
+	case errors.Is(err, secretsapp.ErrNotFound), errors.Is(err, workspacesdomain.ErrNotFound), errors.Is(err, projectsdomain.ErrNotFound), errors.Is(err, environmentsdomain.ErrNotFound):
 		return http.StatusNotFound
+	case errors.Is(err, workspacesdomain.ErrSlugTaken), errors.Is(err, projectsdomain.ErrSlugTaken), errors.Is(err, environmentsdomain.ErrSlugTaken):
+		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError
 	}
