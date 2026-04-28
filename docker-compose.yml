@@ -40,5 +40,16 @@ services:
     ports:
       - "6379:6379"
 
+  cli:
+    build:
+      context: .
+      dockerfile: apps/cli/Dockerfile
+    profiles: ["tools"]
+    environment:
+      DEVSVAULT_API_URL: "http://api:8080"
+    depends_on:
+      api:
+        condition: service_started
+
 volumes:
   postgres-data:
