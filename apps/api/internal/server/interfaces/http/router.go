@@ -70,7 +70,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("POST /api/v1/secrets/{id}/versions", r.withAuth(http.HandlerFunc(r.rotateSecret)))
 	mux.Handle("POST /api/v1/secrets/{id}/versions/{version}/revoke", r.withAuth(http.HandlerFunc(r.revokeSecretVersion)))
 	mux.Handle("GET /api/v1/audit/events", r.withAuth(http.HandlerFunc(r.listAudit)))
-	return securityHeaders(mux)
+	return securityHeaders(cors(mux))
 }
 
 func (r *router) health(w http.ResponseWriter, _ *http.Request) {
@@ -208,6 +208,58 @@ func securityHeaders(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, req)
 	})
+}
+
+func cors(next http.Handler) http.Handler {
+	allowedOrigins := configuredCORSOrigins()
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		origin := req.Header.Get("Origin")
+		originAllowed := origin != "" && isCORSOriginAllowed(origin, allowedOrigins)
+		if originAllowed {
+			w.Header().Add("Vary", "Origin")
+			w.Header().Add("Vary", "Access-Control-Request-Method")
+			w.Header().Add("Vary", "Access-Control-Request-Headers")
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			w.Header().Set("Access-Control-Max-Age", "600")
+		}
+
+		if req.Method == http.MethodOptions {
+			if origin != "" && !originAllowed {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, req)
+	})
+}
+
+func configuredCORSOrigins() []string {
+	value := os.Getenv("CORS_ALLOWED_ORIGINS")
+	if value == "" {
+		return []string{"http://localhost:3000", "http://127.0.0.1:3000"}
+	}
+	origins := []string{}
+	for _, origin := range strings.Split(value, ",") {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			origins = append(origins, origin)
+		}
+	}
+	return origins
+}
+
+func isCORSOriginAllowed(origin string, allowedOrigins []string) bool {
+	for _, allowedOrigin := range allowedOrigins {
+		if origin == allowedOrigin {
+			return true
+		}
+	}
+	return false
 }
 
 func parseActorType(value string) (authdomain.ActorType, bool) {

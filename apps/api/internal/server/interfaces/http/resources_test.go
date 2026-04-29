@@ -68,6 +68,27 @@ func TestResourceRouteConflict(t *testing.T) {
 	doResourceRequest(t, handler, token, http.MethodPost, "/api/v1/workspaces", map[string]string{"name": "Acme 2", "slug": "acme"}, http.StatusConflict)
 }
 
+func TestCORSPreflightAllowsLocalWeb(t *testing.T) {
+	t.Setenv("CORS_ALLOWED_ORIGINS", "")
+	handler, _ := testResourceRouter(t)
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/auth/login", nil)
+	req.Header.Set("Origin", "http://localhost:3000")
+	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	req.Header.Set("Access-Control-Request-Headers", "content-type,authorization")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected preflight success, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:3000" {
+		t.Fatalf("unexpected allow origin %q", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Headers"); got != "Authorization, Content-Type" {
+		t.Fatalf("unexpected allow headers %q", got)
+	}
+}
+
 func testResourceRouter(t *testing.T) (http.Handler, string) {
 	t.Helper()
 	auditService := auditapp.NewService(auditinfra.NewMemoryRepository())
