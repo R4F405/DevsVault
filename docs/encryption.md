@@ -26,6 +26,13 @@ El MVP usa envelope encryption con AES-256-GCM.
 
 El servicio de cifrado depende de un puerto `KEKProvider`. El adaptador de desarrollo lee una clave base64 desde el entorno; un adaptador productivo debe implementar el mismo contrato usando AWS KMS, GCP KMS, Azure Key Vault, Vault Transit u otro proveedor.
 
+## Estado actual
+
+- La API exige `DEVSVAULT_MASTER_KEY_B64` y `DEVSVAULT_AUTH_SIGNING_KEY`; ambas deben decodificar a 32 bytes.
+- Docker Compose usa claves fijas solo para desarrollo local reproducible.
+- En ejecucion manual se debe generar una clave fuera del repo y exportarla en la terminal antes de arrancar la API.
+- PostgreSQL almacena solo `ciphertext`, `nonce`, `wrapped_dek`, `dek_nonce`, `key_id` y metadatos de version.
+
 ## Riesgos pendientes
 
 - Agregar rotacion de KEK con rewrap de DEKs.

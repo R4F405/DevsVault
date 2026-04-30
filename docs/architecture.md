@@ -6,6 +6,9 @@ DevsVault se organiza como una plataforma de infraestructura critica. El dominio
 
 - `auth`: usuarios humanos, identidades de servicio, sesiones y preparacion OIDC.
 - `policies`: roles, grants y decisiones de autorizacion por recurso.
+- `workspaces`: raiz de aislamiento y administracion de espacios.
+- `projects`: agrupacion de aplicaciones dentro de un workspace.
+- `environments`: entornos por proyecto, como `dev`, `staging` o `prod`.
 - `secrets`: paths logicos, versiones, revocacion y lectura controlada.
 - `encryption`: envelope encryption, proveedores KEK y preparacion KMS.
 - `audit`: eventos inmutables y sanitizados de acciones sensibles.
@@ -49,13 +52,15 @@ Acciones granulares iniciales:
 
 ## Decisiones
 
-- El MVP implementa repositorios en memoria para arrancar y testear servicios sin infraestructura externa; las migraciones SQL definen el contrato persistente.
+- El MVP implementa repositorios PostgreSQL para ejecucion con Docker Compose y mantiene repositorios en memoria como fallback de desarrollo y tests.
 - El cifrado se implementa antes que la UI para evitar un CRUD inseguro.
 - La autorizacion vive en un servicio central y tambien se aplica en HTTP para mantener least privilege.
 - Las respuestas de listado nunca contienen valores completos de secretos.
+- La API, el panel web y la CLI consumen los mismos contratos HTTP versionados bajo `/api/v1`.
 
 ## Riesgos
 
-- La memoria no es persistente y debe reemplazarse por PostgreSQL antes de un despliegue real.
 - Las variables de entorno de desarrollo para KEK y firma no equivalen a KMS ni OIDC productivo.
+- El almacenamiento local del token de la CLI todavia necesita keychain del sistema o equivalente.
+- La persistencia PostgreSQL actual cubre el MVP, pero faltan migraciones operativas, backups y estrategia de recovery para produccion.
 - Falta proteccion criptografica anti-manipulacion para audit logs, como hash chaining o almacenamiento WORM.

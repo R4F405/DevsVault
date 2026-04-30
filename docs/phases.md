@@ -22,15 +22,15 @@ Decisiones:
 
 - AES-256-GCM para secreto y DEK envuelta.
 - `KEKProvider` como puerto para KMS externo.
-- Repositorios en memoria para MVP ejecutable y tests rapidos.
+- Repositorios PostgreSQL para ejecucion local completa y repositorios en memoria para fallback y tests rapidos.
 
 Riesgos:
 
-- Falta adaptador PostgreSQL y rotacion de KEK.
+- Falta rotacion de KEK y hardening operativo de Postgres.
 
 Pendientes:
 
-- Implementar repos SQL transaccionales.
+- Rewrap de DEKs, backups documentados y tests de integracion contra Postgres.
 
 ## Fase 3: auth y permisos
 
@@ -66,8 +66,10 @@ Pendientes:
 
 Decisiones:
 
-- `pull`, `run` e `inject` consumen API por path logico.
-- No se escriben secretos a disco salvo salida explicita del usuario.
+- `login` guarda una sesion local y `logout` la elimina.
+- `workspaces`, `projects` y `environments` gestionan recursos via API.
+- `secrets list|get|set|rotate|revoke` consume la API por path logico o ID.
+- `run -- <command>` inyecta secretos como variables de entorno sin escribir valores a disco.
 
 Riesgos:
 
@@ -81,16 +83,16 @@ Pendientes:
 
 Decisiones:
 
-- Primera pantalla centrada en secretos, permisos y auditoria.
+- Panel Next.js conectado a la API para login, dashboard, recursos, secretos y auditoria.
 - No se muestran valores completos en listados.
 
 Riesgos:
 
-- Falta integracion real con API y flujos de OIDC.
+- Falta OIDC real, manejo fino de permisos por vista y pruebas visuales/E2E.
 
 Pendientes:
 
-- Formularios conectados, estados de error y pruebas visuales.
+- Pulir estados vacios/error, permisos en UI y pruebas visuales.
 
 ## Fase 7: SDKs
 
